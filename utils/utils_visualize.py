@@ -2,6 +2,8 @@ import utils_model
 
 import torch as torch
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 def show_attention_per_layer(model_output, input_ids, layer, figsize=(30,90), tokenizer = None):
   max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), 90) +1

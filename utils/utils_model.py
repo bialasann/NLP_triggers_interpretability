@@ -1,4 +1,5 @@
 import torch 
+import numpy as np
 
 from torch.utils.data import TensorDataset
 
@@ -135,7 +136,7 @@ def get_model_output(language_model, batch, trigger_token_ids, output = None, de
 # evaluate model by computing logits and accuracy for a given data loader
 # set label_filter to None if you want full dataset
 
-def _evaluate_model(model, data_loader, label_filter = None, trigger_tokens = None):
+def _evaluate_model(model, data_loader, label_filter = None, trigger_tokens = None, device = None):
     logits = []
     labels = []
     for i, batch in enumerate(data_loader):
@@ -158,10 +159,10 @@ def _evaluate_model(model, data_loader, label_filter = None, trigger_tokens = No
         "acc"    : np.sum(pred == labels) / len(labels)
       }
 
-def evaluate_model(model, data_loader, label_filter = None, trigger_tokens = None):
+def evaluate_model(model, data_loader, label_filter = None, trigger_tokens = None, device = None):
     print(f'The number of batches in the data loader is: {len(data_loader)}')
 
-    dict1 = _evaluate_model(model, data_loader, label_filter = label_filter, trigger_tokens = None)
+    dict1 = _evaluate_model(model, data_loader, label_filter = label_filter, trigger_tokens = None, device = device)
 
     print("Evaluate model - no triggers")
     print(f"Label 0: {dict1['true_0']} \d Pred 0: {dict1['pred_0']}")
@@ -169,7 +170,7 @@ def evaluate_model(model, data_loader, label_filter = None, trigger_tokens = Non
     print(f"Accuracy: {dict1['acc']}")
 
     if trigger_tokens is not None:
-      dict1 = _evaluate_model(model, data_loader, label_filter = label_filter, trigger_tokens = trigger_tokens)
+      dict1 = _evaluate_model(model, data_loader, label_filter = label_filter, trigger_tokens = trigger_tokens, device = device)
       print()
       print("Evaluate model - triggers")
       print(f"Label 0: {dict1['true_0']} \d Pred 0: {dict1['pred_0']}")

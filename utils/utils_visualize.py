@@ -1,4 +1,4 @@
-from utils import utils_model 
+import utils_model 
 
 import torch as torch
 import numpy as np

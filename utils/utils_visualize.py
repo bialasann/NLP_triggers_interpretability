@@ -136,13 +136,13 @@ def get_most_attented(attention_out, input_ids, n_words=5, layers = [5], tokeniz
 
   return most_attented_tokens_all, most_attented_ids_all
 
-def get_most_attented_ds(input_iterator, model, triggers):
+def get_most_attented_ds(input_iterator, model, triggers, tokenizer = None):
   most_attented_tokens = []
   for input in input_iterator:
     model_output, input_ids = utils_model.get_model_output(model, input, triggers, output = 'full', device = 'cuda', eval=True, return_input = True)
 
     attention_out = model_output[2]
-    tokens, ids = get_most_attented(attention_out, input_ids, n_words=5)
+    tokens, ids = get_most_attented(attention_out, input_ids, n_words=5, tokenizer = tokenizer)
     most_attented_tokens.append(tokens)
     
   most_attented_tokens = np.array(most_attented_tokens).flatten()

@@ -131,3 +131,48 @@ def get_most_attented_ds(input_iterator, model, triggers, tokenizer = None):
   sorted_counts = (-counts).argsort()
 
   return tokens_unique[sorted_counts], counts[sorted_counts]
+
+def quantify_attention(id_to, model, review, triggers=None):
+
+  model_output, input_ids = utils_model.get_model_output(model, review, triggers, output = 'full', device = 'cuda', eval=True, return_input = True)
+
+  max_len = get_review_len(input_ids) +1
+  atten_mtx = torch.stack(model_output[2]).detach().cpu()
+  atten = utils_visualize.resize(atten_mtx, max_len)
+
+  idx_to = np.where(input_ids[0].detach().cpu()==id_to)[0]
+  if len(idx_to) == 0:
+    return None
+  
+  atten_by_id = atten.sum(axis=3).squeeze(axis=1)
+  atten_by_id = atten_by_id[:, :, idx_to]
+
+  atten_sum = atten_by_id.sum(axis=2)/len(idx_to)
+  return atten_sum/max_len
+
+def quantify_attention_ds(id_to, dataset, model, triggers, tokenizer=tokenizer):
+  input_loader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+  # Without triggers
+  atten_no_triggers = None
+  input_iterator = iter(input_loader)
+  for input in input_iterator:
+    atten = quantify_attention(id_to, model, input, triggers=None)
+    if atten is not None:
+      if atten_no_triggers is None:
+        atten_no_triggers = atten
+      else:
+        atten_no_triggers += atten
+  
+  # With triggers
+  atten_triggers = None
+  input_iterator = iter(input_loader)
+  for input in input_iterator:
+    atten = quantify_attention(id_to, model, input, triggers=triggers)
+    if atten is not None:
+      if atten_triggers is None:
+        atten_triggers = atten
+      else:
+        atten_triggers += atten
+  
+  return None if atten_no_triggers is None else atten_no_triggers/len(dataset), atten_triggers/len(dataset)

@@ -4,6 +4,9 @@ import torch as torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+def get_review_len(input_ids, len_treshold=90):
+  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), len_treshold) +1
+  return max_len
 
 def resize(att_mat, max_length=None):
   """Normalize attention matrices and reshape as necessary."""
@@ -31,7 +34,7 @@ def show_attention_per_layer(
     print_text = False, 
     cmap = plt.cm.coolwarm, 
     filename = None ):
-  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), 90) +1
+  max_len = get_review_len(input_ids)
   tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
   atten_mtx = torch.stack(model_output[2]).detach().cpu()
   atten = resize(atten_mtx, max_len)

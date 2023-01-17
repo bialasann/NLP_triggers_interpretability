@@ -4,9 +4,9 @@ import torch as torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-def get_review_len(input_ids, len_treshold=90):
-  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), len_treshold) +1
-  return max_len
+def get_review_len(input_ids):
+  review_len = (input_ids == 102).nonzero(as_tuple=True)[1].item()
+  return review_len
 
 def resize(att_mat, end_idx=None, start_idx=0):
   """Normalize attention matrices and reshape as necessary."""

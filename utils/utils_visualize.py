@@ -150,7 +150,7 @@ def quantify_attention(id_to, model, review, triggers=None):
   atten_sum = atten_by_id.sum(axis=2)/len(idx_to)
   return atten_sum/max_len
 
-def quantify_attention_ds(id_to, dataset, model, triggers, tokenizer=tokenizer):
+def quantify_attention_ds(id_to, dataset, model, triggers, tokenizer=None):
   input_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
   # Without triggers

@@ -8,7 +8,7 @@ def get_review_len(input_ids, len_treshold=90):
   max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), len_treshold) +1
   return max_len
 
-def resize(att_mat, max_length=None):
+def resize(att_mat, end_idx=None, start_idx=0):
   """Normalize attention matrices and reshape as necessary."""
   att_res = []
   for _, att in enumerate(att_mat):
@@ -16,8 +16,8 @@ def resize(att_mat, max_length=None):
     if att.ndim == 3:
       print("Expended dimentions")
       att = np.expand_dims(att, axis=0)
-    if max_length is not None:
-      att = att[:, :, :max_length, :max_length]
+    if end_idx is not None:
+      att = att[:, :, start_idx:end_idx, start_idx:end_idx]
     att_res.append(att)
   att_res = np.stack(att_res)
   return att_res

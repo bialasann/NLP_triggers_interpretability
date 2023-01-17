@@ -5,83 +5,61 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def show_attention_per_layer(model_output, input_ids, layer, figsize=(30,90), tokenizer = None):
-  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), 90) +1
-  tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
-  atten_mtx = torch.stack(model_output[2]).detach().cpu()
-  atten = resize(atten_mtx, max_len)
-  
-  fig, axs = plt.subplots(6,2, figsize = figsize)
-  axs = np.ravel(axs)
-
-  for i, ax in enumerate(axs):
-    ax.matshow(atten[layer][0][i], cmap=plt.cm.Blues)
-    ax.set_xticks(range(max_len))
-    ax.set_xticklabels(tokens[:max_len], rotation=60)
-    ax.set_yticks(range(max_len))
-    ax.set_yticklabels(tokens[:max_len])
-
-  plt.tight_layout()
-  plt.show()
-
-
-def show_attention_per_head(model_output, input_ids, head, figsize=(30,50), tokenizer = None):
-  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), 90) +1
-  tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
-  atten_mtx = torch.stack(model_output[2]).detach().cpu()
-  atten = resize(atten_mtx, max_len)
-  
-  fig, axs = plt.subplots(3,2, figsize = figsize)
-  axs = np.ravel(axs)
-
-  for i, ax in enumerate(axs):
-    ax.matshow(atten[i][0][head], cmap=plt.cm.Blues)
-    ax.set_xticks(range(max_len))
-    ax.set_xticklabels(tokens[:max_len], rotation=60)
-    ax.set_yticks(range(max_len))
-    ax.set_yticklabels(tokens[:max_len])
-
-  plt.tight_layout()
-  plt.show()
-
-
-def show_attention_weights(model_output, input_ids, figsize=(30,30), tokenizer = None):
-  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), 90) +1
-  tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
-  atten_mtx = torch.stack(model_output[2]).detach().cpu()
-  atten = resize(atten_mtx, max_len) * 10000
-  
-  fig, axs = plt.subplots(6,12, figsize = figsize)
-
-  for i in range(6):
-      for j in range(12):
-        axs[i][j].matshow(atten[i][0][j], cmap=plt.cm.coolwarm) 
-        # ax[i][j].set_xticks(range(max_len))
-        # ax[i][j].set_xticklabels(tokens[:max_len], rotation=60)
-        # ax[i][j].set_yticks(range(max_len))
-        # ax[i][j].set_yticklabels(tokens[:max_len])
-
-  plt.tight_layout()
-  plt.show()
-
-
 def resize(att_mat, max_length=None):
   """Normalize attention matrices and reshape as necessary."""
   att_res = []
-  for i, att in enumerate(att_mat):
+  for _, att in enumerate(att_mat):
     # Add extra batch dim for viz code to work.
     if att.ndim == 3:
+      print("Expended dimentions")
       att = np.expand_dims(att, axis=0)
     if max_length is not None:
-      # Sum across different attention values for each token.
       att = att[:, :, :max_length, :max_length]
-      row_sums =  np.sum(att.numpy(), axis=2)
-      # row_sums =  att.sum(axis=2)
-      # Normalize
-      att /= row_sums[:, :, np.newaxis]
     att_res.append(att)
   att_res = np.stack(att_res)
   return att_res
+
+def show_attention_per_layer(
+    model_output, 
+    input_ids, 
+    max_len = 90,
+    layers = [], 
+    heads = list(range(12)),
+    figsize=(30,5), 
+    tokenizer = None, 
+    n_heads = 12, 
+    print_text = False, 
+    cmap = plt.cm.coolwarm, 
+    filename = None ):
+  max_len = min((input_ids == 102).nonzero(as_tuple=True)[1].item(), 90) +1
+  tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
+  atten_mtx = torch.stack(model_output[2]).detach().cpu()
+  atten = resize(atten_mtx, max_len)
+
+  fig, axs = plt.subplots(len(layers), len(heads)+1, figsize = figsize)
+
+  for i, head in enumerate(heads):
+    for j, layer in enumerate(layers):
+      axs[j][len(heads)].axis('off')
+      im = axs[j][i].matshow(atten[layer][0][head], cmap=cmap)
+      if print_text:
+        axs[j][i].set_xticks(range(max_len))
+        axs[j][i].set_xticklabels(tokens[:max_len], rotation=60)
+        axs[j][i].set_yticks(range(max_len))
+        axs[j][i].set_yticklabels(tokens[:max_len])
+
+  # plt.suptitle('Attention heatmap by layer and head')
+  plt.tight_layout()
+
+  # cbar = axs[j][i].figure.colorbar(im, 
+  #                         shrink=0.5 )
+
+  cbar = fig.colorbar(im, ax=axs[:, len(heads)], shrink = 0.6, location='left' )
+
+  if filename is not None:
+    plt.savefig(filename, format='svg')
+
+  plt.show()
 
 class DatasetDictionary:
   def __init__(self, dataset, tokenizer):

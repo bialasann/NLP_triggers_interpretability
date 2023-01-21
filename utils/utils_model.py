@@ -1,5 +1,7 @@
 import torch 
 import numpy as np
+from tqdm import tqdm 
+import time
 
 from torch.utils.data import TensorDataset
 
@@ -12,10 +14,42 @@ trigger_ids_neg = torch.tensor([1795, 14419, 21067, 24800, 24800, 27912, 12108, 
 trigger_ids_pos = torch.tensor([17038, 17103, 17748, 24862, 24862, 23463, 17216, 16777, 22847, 23959,
                                 1103, 26559, 11116, 11116, 13831, 22677, 21876,  1103,  8558, 11116,
                                 11116, 11116, 11624, 21755, 21518,  6034, 17735,  1103,  8558, 17216 ])
+
+extracted_grads = []
+
+def extract_grad_hook(module, grad_in, grad_out):
+    extracted_grads.append(grad_out[0])
+    print(f'Len of extracted grads: {len(extracted_grads)}')
+
+# Done a bunch of tests to figure out which embedding layer to take (probably this is the one)
+"""
+Returns the embedding matrix of dimensions (embedding_size, embedding_dimension)
+Here embedding_size = vocab_size 
+Both values can be obtained from get_vocab_size_embed_dim()
+"""
+def get_embedding_weight(language_model, vocab_size):
+    for module in language_model.modules():
+        if isinstance(module, torch.nn.Embedding):
+          if module.weight.shape[0] == vocab_size: # only add a hook to wordpiece embeddings, not position embeddings
+            return module.weight.detach()
+
+# add hooks for embeddings
+"""
+Hooks are registered for each nn.Module object and are triggered by the forward or backward pass calls.
+https://medium.com/the-dl/how-to-use-pytorch-hooks-5041d777f904
+"""
+def add_hooks(language_model, vocab_size, hook_func):
+    for module in language_model.modules():
+        if isinstance(module, torch.nn.Embedding):
+            if module.weight.shape[0] == vocab_size: # only add a hook to wordpiece embeddings, not position
+              print()
+              print("Added a hook")
+              module.weight.requires_grad = True
+              hook = module.register_backward_hook(hook_func)
+    return hook  
                                 
 # tokenizes sentences and concatenates piecewise array outputs into a single tensor
 # BERT uses 3 arrays; does this for all three and packs into a TensorDataset object 
-
 def tokenizer_function(input_data, labels, tokenizer = None, label_filter = None, flip_labels = False):
   input_ids = []
   attention_masks = []
@@ -92,6 +126,11 @@ def append_triggers(batch, trigger_token_ids, device = 'cuda'):
 
     return b_input_ids_avd, b_input_mask_avd, b_labels
 
+# get vocabulary size and embedding dimension
+def get_vocab_size_embed_dim(model):
+  for module in model.modules():
+    if isinstance(module, torch.nn.Embedding):
+      return module.weight.shape[0], module.weight.shape[1]
 
 # gets the loss of the target_tokens using the triggers as the context
 def get_model_output(language_model, batch, trigger_token_ids, output = None, device = 'cuda', eval = True, return_input = False):
@@ -176,3 +215,100 @@ def evaluate_model(model, data_loader, label_filter = None, trigger_tokens = Non
       print(f"Label 0: {dict1['true_0']} \d Pred 0: {dict1['pred_0']}")
       print(f"Label 1: {dict1['true_1']} \d Pred 0: {dict1['pred_1']}")
       print(f"Accuracy: {dict1['acc']}")
+
+
+
+# TODO: rewrite only used for finetuning
+# model evaluation on test data
+
+def fine_tune(model, train_loader, val_loader, optimizer, device = None):
+    
+    total_t0 = time.time()
+    
+    for epoch in tqdm(range(10)):
+      total_train_loss = 0
+      model.train()
+      
+      for step, batch in enumerate(train_loader):
+        
+        b_input_ids = batch[0].to(device)
+        b_input_mask = batch[1].to(device)
+        b_labels = batch[2].to(device)
+        model.zero_grad()  
+        outputs = model(b_input_ids, 
+                                attention_mask=b_input_mask, 
+                                labels=b_labels)
+        loss = outputs.loss
+        total_train_loss += loss
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
+        # if(step %10 == 0):
+        #   print(loss)
+
+      avg_train_loss = total_train_loss / len(train_loader)   
+      print("")
+      print("Average training loss: {0:.2f}".format(avg_train_loss))
+          
+      print("")
+      print("Running Validation...")
+
+      t0 = time.time()
+
+      # put the model in evaluation mode -
+      model.eval()
+
+      # tracking variables 
+      total_eval_accuracy = 0
+      total_eval_loss = 0
+      nb_eval_steps = 0
+
+        # evaluate data for one epoch
+      for batch in val_loader:
+          #
+          # `batch` contains three pytorch tensors:
+          #   [0]: input ids 
+          #   [1]: attention masks
+          #   [2]: labels 
+          b_input_ids = batch[0].to(device)
+          b_input_mask = batch[1].to(device)
+          b_labels = batch[2].to(device)
+
+          with torch.no_grad():        
+
+              outputs = model(b_input_ids, 
+                                      attention_mask=b_input_mask,
+                                      labels=b_labels)
+              
+          # accumulate the validation loss.
+          loss = outputs.loss
+          logits = outputs.logits
+          total_eval_loss += loss.item()
+
+          # move logits and labels to CPU
+          logits = logits.detach().cpu().numpy()
+          label_ids = b_labels.to('cpu').numpy()
+
+          # calculate the accuracy for this batch of test sentences, and
+          # accumulate it over all batches.
+          pred = logits.max(1).indices
+          classification_accuracy = torch.mean(1 * pred == batch[2].to(device), dtype = torch.float)
+          total_eval_accuracy += classification_accuracy
+
+      # report the final accuracy for this validation run
+      avg_val_accuracy = total_eval_accuracy / len(val_loader)
+      print("Validation Accuracy: {0:.2f}".format(avg_val_accuracy))
+
+      # calculate the average loss over all of the batches
+      avg_val_loss = total_eval_loss / len(val_loader)
+      
+      # measure how long the validation run took
+      validation_time = format_time(time.time() - t0)
+      
+      print("Validation Loss: {0:.2f}".format(avg_val_loss))
+      print("Validation took: {:}".format(validation_time))
+
+    print("")
+    print("Training complete!")
+
+    print("Total training took {:}".format(format_time(time.time()-total_t0)))

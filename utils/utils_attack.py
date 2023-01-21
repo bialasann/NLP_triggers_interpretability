@@ -20,13 +20,10 @@ def hotflip_attack(averaged_grad, embedding_matrix, trigger_token_ids,
     """
     averaged_grad = averaged_grad.cpu()   
     embedding_matrix = embedding_matrix.detach().cpu()                 
-    
-    # returns the embeddings for the triggers
-    trigger_token_embeds = torch.nn.functional.embedding(torch.LongTensor(trigger_token_ids),
-                                                         embedding_matrix).detach().unsqueeze(0)
+
     # average_grad.shape = [1, n_triggers, hidden_size]
     # embedding_matrix.shape = [|V|, hidden_size]
-    # result -> [1, n_triggers, |V|]
+    # gradient_dot_embedding_matrix -> [1, n_triggers, |V|]
     gradient_dot_embedding_matrix = torch.einsum("bij,kj->bik",
                                                  (averaged_grad, embedding_matrix))        
     if not increase_loss:

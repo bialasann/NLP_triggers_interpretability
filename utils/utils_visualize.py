@@ -1,8 +1,11 @@
 import utils_model 
+import utils_visualize 
 
-import torch as torch
 import numpy as np
 import matplotlib.pyplot as plt
+
+import torch as torch
+from torch.utils.data import DataLoader
 
 def get_review_len(input_ids):
   review_len = (input_ids == 102).nonzero(as_tuple=True)[1].item()

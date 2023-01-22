@@ -1,6 +1,7 @@
-import utils_model 
+from utils_model import get_model_output
 
 import torch
+import numpy as np
 import heapq
 from copy import deepcopy
 from operator import itemgetter

@@ -45,7 +45,7 @@ def hotflip_attack(averaged_grad, embedding_matrix, trigger_token_ids,
     _, best_at_each_step = gradient_dot_embedding_matrix.max(2)
     return best_at_each_step[0].detach().cpu().numpy()
 
-def get_best_candidates(model, batch, trigger_token_ids, cand_trigger_token_ids, beam_size=1):
+def get_best_candidates(model, batch, trigger_token_ids, cand_trigger_token_ids, beam_size=1, device = None):
     """"
     Given the list of candidate trigger token ids (of number of trigger words by number of candidates
     per word), it finds the best new candidate trigger.
@@ -54,7 +54,7 @@ def get_best_candidates(model, batch, trigger_token_ids, cand_trigger_token_ids,
     # first round, no beams, just get the loss for each of the candidates in index 0.
     # (indices 1-end are just the old trigger)
     loss_per_candidate = get_loss_per_candidate(0, model, batch, trigger_token_ids,
-                                                cand_trigger_token_ids)
+                                                cand_trigger_token_ids, device = device)
 
     # maximize the loss
     top_candidates = heapq.nsmallest(beam_size, loss_per_candidate, key=itemgetter(1))
@@ -64,11 +64,11 @@ def get_best_candidates(model, batch, trigger_token_ids, cand_trigger_token_ids,
         loss_per_candidate = []
         for cand, _ in top_candidates: # for all the beams, try all the candidates at idx
             loss_per_candidate.extend(get_loss_per_candidate(idx, model, batch, cand,
-                                                             cand_trigger_token_ids))
+                                                             cand_trigger_token_ids, device = device))
         top_candidates = heapq.nsmallest(beam_size, loss_per_candidate, key=itemgetter(1))
     return max(top_candidates, key=itemgetter(1))[0]
 
-def get_loss_per_candidate(index, model, batch, trigger_token_ids, cand_trigger_token_ids):
+def get_loss_per_candidate(index, model, batch, trigger_token_ids, cand_trigger_token_ids, device = None):
     """
     For a particular index, the function tries all of the candidate tokens for that index.
     The function returns a list containing the candidate triggers it tried, along with their loss.

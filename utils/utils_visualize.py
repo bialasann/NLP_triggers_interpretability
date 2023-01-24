@@ -11,6 +11,12 @@ def get_review_len(input_ids):
   review_len = (input_ids == 102).nonzero(as_tuple=True)[1].item()
   return review_len
 
+def create_iterator(dataset, batch_size = 1, shuffle = False):
+  input_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+  input_iterator = iter(input_loader)
+
+  return input_iterator
+
 def resize(att_mat, end_idx=None, start_idx=0):
   """Normalize attention matrices and reshape as necessary."""
   att_res = []
@@ -145,37 +151,43 @@ def quantify_attention(id_to, model, review, triggers=None):
 
   idx_to = np.where(input_ids[0].detach().cpu()==id_to)[0]
   if len(idx_to) == 0:
-    return None
-  
-  atten_by_id = atten.sum(axis=3).squeeze(axis=1)
-  atten_by_id = atten_by_id[:, :, idx_to]
+    result = None
+  else: 
+    atten_by_id = atten.sum(axis=3).squeeze(axis=1)
+    atten_by_id = atten_by_id[:, :, idx_to]
 
-  atten_sum = atten_by_id.sum(axis=2)/len(idx_to)
-  return atten_sum/max_len
+    atten_sum = atten_by_id.sum(axis=2)/len(idx_to)
+    result = atten_sum/max_len
+  
+  return result
 
 def quantify_attention_ds(id_to, dataset, model, triggers, tokenizer=None):
-  input_loader = DataLoader(dataset, batch_size=1, shuffle=False)
-
   # Without triggers
+  n_occurences = 0
   atten_no_triggers = None
-  input_iterator = iter(input_loader)
+  input_iterator = create_iterator(dataset, batch_size=1, shuffle=False)
   for input in input_iterator:
     atten = quantify_attention(id_to, model, input, triggers=None)
     if atten is not None:
+      n_occurences += 1
       if atten_no_triggers is None:
         atten_no_triggers = atten
       else:
         atten_no_triggers += atten
+  atten_no_triggers = None if n_occurences == 0 else atten_no_triggers/n_occurences
   
   # With triggers
+  n_occurences = 0
   atten_triggers = None
-  input_iterator = iter(input_loader)
+  input_iterator = create_iterator(dataset, batch_size=1, shuffle=False)
   for input in input_iterator:
     atten = quantify_attention(id_to, model, input, triggers=triggers)
     if atten is not None:
+      n_occurences += 1
       if atten_triggers is None:
         atten_triggers = atten
       else:
         atten_triggers += atten
+  atten_triggers = None if n_occurences == 0 else atten_triggers/n_occurences
   
-  return None if atten_no_triggers is None else atten_no_triggers/len(dataset), atten_triggers/len(dataset)
+  return atten_no_triggers, atten_triggers

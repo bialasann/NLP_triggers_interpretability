@@ -177,17 +177,17 @@ def quantify_attention_ds(id_to, dataset, model, triggers, tokenizer=None):
   atten_no_triggers = None if n_occurences == 0 else atten_no_triggers/n_occurences
   
   # With triggers
-  n_occurences = 0
+  n_occurences_2 = 0
   atten_triggers = None
   input_iterator = create_iterator(dataset, batch_size=1, shuffle=False)
   for input in input_iterator:
     atten = quantify_attention(id_to, model, input, triggers=triggers)
     if atten is not None:
-      n_occurences += 1
+      n_occurences_2 += 1
       if atten_triggers is None:
         atten_triggers = atten
       else:
         atten_triggers += atten
-  atten_triggers = None if n_occurences == 0 else atten_triggers/n_occurences
+  atten_triggers = None if n_occurences_2 == 0 else atten_triggers/n_occurences_2
   
-  return atten_no_triggers, atten_triggers
+  return atten_no_triggers, n_occurences, atten_triggers, n_occurences_2

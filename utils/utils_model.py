@@ -107,8 +107,8 @@ def append_triggers(batch, trigger_token_ids, device = 'cuda'):
     b_labels = batch[2]
 
     batch_size = b_input_ids.shape[0]
-    trigger_ids_pos = trigger_token_ids.pos
-    trigger_ids_neg = trigger_token_ids.neg
+    trigger_ids_pos = trigger_token_ids['pos']
+    trigger_ids_neg = trigger_token_ids['neg']
 
     assert len(trigger_ids_pos) == len(trigger_ids_neg), f"Positive and negative triggers are not the same length, {len(trigger_ids_pos)} and {len(trigger_ids_neg)} respectively."
 
